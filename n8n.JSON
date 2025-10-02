@@ -1,0 +1,212 @@
+{
+  "name": "Image generation",
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_HUGGING_FACE_API_TOKEN_HERE"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "image/png"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"inputs\": {{ $json.inputs }}\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        864,
+        16
+      ],
+      "id": "c34b6a11-8db5-491f-a1db-c8207e5f332f",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        48,
+        16
+      ],
+      "id": "36fe2acf-c387-4357-a28d-cbf4e3d293c7",
+      "name": "When chat message received",
+      "webhookId": "REPLACE_WITH_YOUR_WEBHOOK_ID"
+    },
+    {
+      "parameters": {
+        "messages": {
+          "messageValues": [
+            {
+              "type": "AIMessagePromptTemplate",
+              "message": "=give me one image prompt from the following text in a realistic style {{ $json.chatInput }} "
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        256,
+        16
+      ],
+      "id": "8ac39de8-9282-4cf0-ba1f-a06a2894c073",
+      "name": "Prompt"
+    },
+    {
+      "parameters": {
+        "model": "google/gemini-2.0-flash-lite-001",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        192,
+        224
+      ],
+      "id": "a8e986cf-2fb0-4ee6-a6cf-e08c9967f135",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "REPLACE_WITH_YOUR_OPENROUTER_CREDENTIAL_ID",
+          "name": "OpenRouter account NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Simple extraction - just get the prompt\nconst responseText = $input.first().json.text;\nconst promptStart = responseText.indexOf('**Prompt:**');\n\nlet extractedPrompt = responseText;\nif (promptStart !== -1) {\n  extractedPrompt = responseText.substring(promptStart + 11).trim();\n}\n\n// Escape newlines and quotes so it’s valid JSON\nconst safePrompt = extractedPrompt\n  .replace(/\\n/g, \" \")      // replace newlines with space\n  .replace(/\"/g, '\\\\\"');    // escape quotes\n\nreturn {\n  json: {\n    inputs: JSON.stringify($input.first().json.text)\n  }\n};\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        16
+      ],
+      "id": "9bc9a110-eeda-4b86-9598-4492a531bf2a",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "name": "={{ $('When chat message received').item.json.chatInput }}",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_YOUR_GOOGLE_DRIVE_FOLDER_ID",
+          "mode": "list",
+          "cachedResultName": "Images",
+          "cachedResultUrl": "REPLACE_WITH_YOUR_GOOGLE_DRIVE_FOLDER_URL"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1072,
+        16
+      ],
+      "id": "f1e4cb48-2fd9-4acb-b74e-0b6ebf2b430e",
+      "name": "Upload file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_GOOGLE_DRIVE_CREDENTIAL_ID",
+          "name": "Google Drive account NAME"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Prompt",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompt": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Upload file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "37906f63-4154-4fd2-85cf-ca98905e3315",
+  "meta": {
+    "templateId": "self-building-ai-agent",
+    "templateCredsSetupCompleted": true,
+    "instanceId": "6e443a7925e4dba68fc70e37502de27e9ab8b7cde0f9e534b3dee964472c5121"
+  },
+  "id": "JgQODKnpNkxS9wrS",
+  "tags": []
+}
